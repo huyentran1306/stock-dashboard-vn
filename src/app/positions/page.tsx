@@ -4,17 +4,85 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLang } from '@/components/providers';
 import { t } from '@/lib/i18n';
-import { getPositions, closePosition, addPosition, type Position } from '@/lib/api';
-import { TrendingUp, TrendingDown, Plus, X, ChevronDown, Wallet, Target, ShieldOff } from 'lucide-react';
+import { getPositions, getAnalysis, closePosition, addPosition, type Position, type StockAnalysis } from '@/lib/api';
+import { TrendingUp, TrendingDown, Plus, X, ChevronDown, Wallet, Target, ShieldOff, AlertTriangle, CheckCircle2, Minus } from 'lucide-react';
 
-function PnLChip({ pos }: { pos: Position }) {
-  const pct = 0; // No real-time price in positions store
+function PnLChip({ pos, currentPrice }: { pos: Position; currentPrice?: number }) {
+  if (!currentPrice) return null;
+  const pct = ((currentPrice - pos.buyPrice) / pos.buyPrice) * 100;
+  const profit = (currentPrice - pos.buyPrice) * pos.quantity * 1000;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold
-      ${pct >= 0 ? 'bg-emerald-500/15 text-emerald-500' : 'bg-rose-500/15 text-rose-500'}`}>
-      {pct >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-      {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
-    </span>
+    <div className="flex items-center gap-2">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold
+        ${pct >= 0 ? 'bg-emerald-500/15 text-emerald-500' : 'bg-rose-500/15 text-rose-500'}`}>
+        {pct >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+        {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+      </span>
+      <span className={`text-xs font-semibold ${pct >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+        {profit >= 0 ? '+' : ''}{(profit / 1_000_000).toFixed(1)}tr
+      </span>
+    </div>
+  );
+}
+
+function SellRecommendation({ pos, analysis }: { pos: Position; analysis?: StockAnalysis }) {
+  if (!analysis) return null;
+  const sellSignals = analysis.signals.filter(s => s.type === 'SELL');
+  const buySignals = analysis.signals.filter(s => s.type === 'BUY');
+  const currentPrice = analysis.currentPrice;
+  const pct = ((currentPrice - pos.buyPrice) / pos.buyPrice) * 100;
+  const hitSL = pct <= -pos.stopLossPercent;
+  const hitTP = pct >= pos.takeProfitPercent;
+
+  if (hitSL) {
+    return (
+      <div className="mt-3 pt-3 border-t border-rose-500/20 flex items-start gap-2 text-xs">
+        <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+        <span className="text-rose-500 font-semibold">Stop-loss chạm mức! Nên xem xét cắt lỗ ngay.</span>
+      </div>
+    );
+  }
+  if (hitTP) {
+    return (
+      <div className="mt-3 pt-3 border-t border-emerald-500/20 flex items-start gap-2 text-xs">
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+        <span className="text-emerald-500 font-semibold">Take-profit đạt mức! Cân nhắc chốt lời.</span>
+      </div>
+    );
+  }
+  if (sellSignals.length > 0 && pct > 0) {
+    return (
+      <div className="mt-3 pt-3 border-t border-amber-500/20 flex items-start gap-2 text-xs">
+        <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+        <span className="text-amber-500 font-semibold">
+          Có {sellSignals.length} tín hiệu BÁN + đang lãi {pct.toFixed(1)}% → Cân nhắc chốt.
+        </span>
+      </div>
+    );
+  }
+  if (sellSignals.length > 0 && pct <= 0) {
+    return (
+      <div className="mt-3 pt-3 border-t border-rose-500/20 flex items-start gap-2 text-xs">
+        <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+        <span className="text-rose-500 font-semibold">
+          Có {sellSignals.length} tín hiệu BÁN + đang lỗ {Math.abs(pct).toFixed(1)}% → Cân nhắc cắt lỗ.
+        </span>
+      </div>
+    );
+  }
+  if (buySignals.length > 0) {
+    return (
+      <div className="mt-3 pt-3 border-t border-emerald-500/20 flex items-start gap-2 text-xs">
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+        <span className="text-emerald-500 font-semibold">Tín hiệu MUA — có thể giữ hoặc thêm vị thế.</span>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 pt-3 border-t border-border/40 flex items-start gap-2 text-xs">
+      <Minus className="w-3.5 h-3.5 text-muted-foreground shrink-0 mt-0.5" />
+      <span className="text-muted-foreground">Không có tín hiệu rõ ràng — theo dõi thêm.</span>
+    </div>
   );
 }
 
@@ -23,6 +91,7 @@ const FORM_INIT = { symbol: '', buyPrice: '', quantity: '', stopLossPercent: '7'
 export default function PositionsPage() {
   const { lang } = useLang();
   const [positions, setPositions] = useState<Position[]>([]);
+  const [analysisMap, setAnalysisMap] = useState<Record<string, StockAnalysis>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -30,8 +99,11 @@ export default function PositionsPage() {
 
   async function load() {
     setLoading(true);
-    const data = await getPositions();
+    const [data, analysisData] = await Promise.all([getPositions(), getAnalysis()]);
     setPositions(data);
+    const map: Record<string, StockAnalysis> = {};
+    for (const a of analysisData) map[a.symbol] = a;
+    setAnalysisMap(map);
     setLoading(false);
   }
 
@@ -172,12 +244,17 @@ export default function PositionsPage() {
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <span className="text-lg font-black text-foreground">{pos.symbol}</span>
-                        <PnLChip pos={pos} />
+                        {analysisMap[pos.symbol] && (
+                          <span className="text-xs text-muted-foreground">
+                            hiện {analysisMap[pos.symbol].currentPrice.toFixed(2)}k
+                          </span>
+                        )}
+                        <PnLChip pos={pos} currentPrice={analysisMap[pos.symbol]?.currentPrice} />
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Target className="w-3 h-3 text-emerald-500" />
-                          {(pos.buyPrice * 1000).toLocaleString('vi-VN')}đ
+                          Mua {(pos.buyPrice * 1000).toLocaleString('vi-VN')}đ
                         </span>
                         <span className="flex items-center gap-1">
                           <ShieldOff className="w-3 h-3 text-rose-500" />
@@ -202,6 +279,7 @@ export default function PositionsPage() {
                         📝 {pos.note}
                       </p>
                     )}
+                    <SellRecommendation pos={pos} analysis={analysisMap[pos.symbol]} />
                   </motion.div>
                 ))}
               </div>
