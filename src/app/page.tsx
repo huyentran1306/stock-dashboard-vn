@@ -1,168 +1,148 @@
-import { getAnalysis, formatPrice, formatPercent, type StockAnalysis } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+'use client';
 
-function RSIBar({ value }: { value: number }) {
-  const color = value < 30 ? "bg-green-500" : value > 70 ? "bg-red-500" : "bg-yellow-500";
-  const zone = value < 30 ? "Oversold 🟢" : value > 70 ? "Overbought 🔴" : "Neutral";
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { useLang } from '@/components/providers';
+import { t } from '@/lib/i18n';
+import { getAnalysis, triggerAnalysis, type StockAnalysis } from '@/lib/api';
+import { StockCard } from '@/components/stock-card';
+import { TrendingUp, TrendingDown, Minus, BarChart3, RefreshCw, Zap } from 'lucide-react';
+
+function StatCard({
+  value, label, icon: Icon, color, index,
+}: {
+  value: number; label: string; icon: typeof TrendingUp; color: string; index: number;
+}) {
   return (
-    <div>
-      <div className="flex justify-between text-xs text-muted-foreground mb-1">
-        <span>RSI(14) — {zone}</span>
-        <span className={value < 30 ? "text-green-400" : value > 70 ? "text-red-400" : "text-yellow-400"}>{value.toFixed(1)}</span>
-      </div>
-      <div className="h-2 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${Math.min(value, 100)}%` }} />
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
-        <span>0</span><span>30</span><span>70</span><span>100</span>
-      </div>
-    </div>
-  );
-}
-
-function BBBar({ percentB }: { percentB: number }) {
-  const clamped = Math.max(0, Math.min(100, percentB));
-  const color = percentB < 20 ? "bg-green-500" : percentB > 80 ? "bg-red-500" : "bg-blue-500";
-  const zone = percentB < 0 ? "Dưới dải thấp 🟢" : percentB > 100 ? "Trên dải cao 🔴" : `%B ${percentB.toFixed(0)}%`;
-  return (
-    <div>
-      <div className="flex justify-between text-xs text-muted-foreground mb-1">
-        <span>Bollinger Band — {zone}</span>
-      </div>
-      <div className="h-2 rounded-full bg-muted overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${clamped}%` }} />
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
-        <span>Dưới</span><span>Giữa</span><span>Trên</span>
-      </div>
-    </div>
-  );
-}
-
-function SignalRow({ type, strength, reason }: { type: string; strength: string; reason: string }) {
-  const bg = type === 'BUY' ? 'bg-green-500/10 border-green-500/30 text-green-300' : type === 'SELL' ? 'bg-red-500/10 border-red-500/30 text-red-300' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300';
-  const icon = type === 'BUY' ? '📈' : type === 'SELL' ? '📉' : '👀';
-  const label = type === 'BUY' ? (strength === 'STRONG' ? 'MUA MẠNH' : 'MUA') : type === 'SELL' ? (strength === 'STRONG' ? 'BÁN MẠNH' : 'BÁN') : 'THEO DÕI';
-  return (
-    <div className={`rounded-lg border px-3 py-2 text-xs ${bg}`}>
-      <span className="font-semibold mr-2">{icon} {label}</span>
-      <span className="opacity-80">{reason}</span>
-    </div>
-  );
-}
-
-function StockCard({ stock }: { stock: StockAnalysis }) {
-  const hasBuy = stock.signals.some(s => s.type === 'BUY' && s.strength !== 'WEAK');
-  const hasSell = stock.signals.some(s => s.type === 'SELL' && s.strength !== 'WEAK');
-  const glow = hasBuy ? 'ring-green-500/40 shadow-green-500/10 shadow-lg' : hasSell ? 'ring-red-500/40 shadow-red-500/10 shadow-lg' : 'ring-border/50';
-
-  return (
-    <Card className={`ring-1 ${glow} bg-card/80 backdrop-blur`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-2xl font-extrabold tracking-tight">{stock.symbol}</CardTitle>
-            <div className="flex gap-3 mt-1">
-              <span className={`text-sm font-medium ${stock.priceChange1D >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {stock.priceChange1D >= 0 ? '▲' : '▼'} {formatPercent(stock.priceChange1D)} hôm nay
-              </span>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold tabular-nums">{formatPrice(stock.currentPrice)}</div>
-            <div className={`text-xs mt-0.5 ${stock.priceChange5D >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              5 ngày: {formatPercent(stock.priceChange5D)}
-            </div>
-          </div>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.08, duration: 0.4 }}
+      className="relative overflow-hidden rounded-2xl border border-border/60 bg-card p-5 shadow-lg"
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">{label}</p>
+          <motion.p
+            className="text-3xl font-black tabular-nums"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.08 + 0.2, type: 'spring', stiffness: 200 }}
+            style={{ color }}
+          >
+            {value}
+          </motion.p>
         </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        <RSIBar value={stock.rsi14} />
-        <BBBar percentB={stock.bbPercentB} />
-
-        <div className="flex gap-2 text-xs">
-          <div className="flex-1 bg-muted rounded-lg p-2 text-center">
-            <div className="text-muted-foreground mb-0.5">MACD</div>
-            <div className={`font-bold ${stock.macdLine > 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {stock.macdLine.toFixed(3)}
-            </div>
-          </div>
-          <div className="flex-1 bg-muted rounded-lg p-2 text-center">
-            <div className="text-muted-foreground mb-0.5">Signal</div>
-            <div className="font-bold">{stock.macdSignal.toFixed(3)}</div>
-          </div>
-          <div className="flex-1 bg-muted rounded-lg p-2 text-center">
-            <div className="text-muted-foreground mb-0.5">Histogram</div>
-            <div className={`font-bold ${stock.macdHistogram > 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {stock.macdHistogram > 0 ? '▲' : '▼'} {Math.abs(stock.macdHistogram).toFixed(3)}
-            </div>
-          </div>
+        <div className="rounded-xl p-2.5" style={{ background: color + '18' }}>
+          <Icon className="w-5 h-5" style={{ color }} />
         </div>
-
-        {stock.signals.length > 0 && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              {stock.signals.map((sig, i) => (
-                <SignalRow key={i} type={sig.type} strength={sig.strength} reason={sig.reason} />
-              ))}
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+      <div
+        className="absolute bottom-0 left-0 right-0 h-0.5 opacity-60"
+        style={{ background: `linear-gradient(90deg, transparent, ${color}, transparent)` }}
+      />
+    </motion.div>
   );
 }
 
-export default async function HomePage() {
-  const analysis = await getAnalysis();
+export default function HomePage() {
+  const { lang } = useLang();
+  const [analysis, setAnalysis] = useState<StockAnalysis[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [triggering, setTriggering] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    const data = await getAnalysis();
+    setAnalysis(data);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleTrigger() {
+    setTriggering(true);
+    await triggerAnalysis();
+    await load();
+    setTriggering(false);
+  }
+
   const buys = analysis.filter(s => s.signals.some(sig => sig.type === 'BUY'));
   const sells = analysis.filter(s => s.signals.some(sig => sig.type === 'SELL'));
   const neutral = analysis.filter(s => !s.signals.some(sig => sig.type === 'BUY' || sig.type === 'SELL'));
 
   return (
-    <div>
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <Card className="bg-green-500/10 border-green-500/30">
-          <CardContent className="py-4 text-center">
-            <div className="text-3xl font-bold text-green-400">{buys.length}</div>
-            <div className="text-sm text-muted-foreground mt-1">📈 Tín hiệu Mua</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-red-500/10 border-red-500/30">
-          <CardContent className="py-4 text-center">
-            <div className="text-3xl font-bold text-red-400">{sells.length}</div>
-            <div className="text-sm text-muted-foreground mt-1">📉 Tín hiệu Bán</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="py-4 text-center">
-            <div className="text-3xl font-bold">{neutral.length}</div>
-            <div className="text-sm text-muted-foreground mt-1">➡️ Trung tính</div>
-          </CardContent>
-        </Card>
+    <div className="space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex flex-col sm:flex-row sm:items-end justify-between gap-4"
+      >
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+            {t(lang, 'market_analysis')}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+            <RefreshCw className="w-3.5 h-3.5" />
+            {t(lang, 'updated_every_15')}
+          </p>
+        </div>
+        <button
+          onClick={handleTrigger}
+          disabled={triggering || loading}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-sm shadow-lg shadow-emerald-500/25 transition-all hover:shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <Zap className="w-4 h-4" />
+          {triggering ? t(lang, 'analyzing') : t(lang, 'trigger_analysis')}
+        </button>
+      </motion.div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <StatCard value={buys.length} label={t(lang, 'buy_signals')} icon={TrendingUp} color="#10b981" index={0} />
+        <StatCard value={sells.length} label={t(lang, 'sell_signals')} icon={TrendingDown} color="#f43f5e" index={1} />
+        <StatCard value={neutral.length} label={t(lang, 'neutral')} icon={Minus} color="#f59e0b" index={2} />
+        <StatCard value={analysis.length} label={t(lang, 'total_stocks')} icon={BarChart3} color="#6366f1" index={3} />
       </div>
 
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Phân tích thị trường</h2>
-        <Badge variant="outline" className="text-xs">Cập nhật mỗi 15 phút</Badge>
-      </div>
-
-      {analysis.length === 0 ? (
-        <Card>
-          <CardContent className="py-16 text-center text-muted-foreground">
-            <div className="text-4xl mb-3">📊</div>
-            <p>Chưa có dữ liệu.</p>
-            <p className="text-xs mt-1">Worker chạy mỗi 15 phút trong giờ giao dịch T2-T6.</p>
-          </CardContent>
-        </Card>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="rounded-2xl border border-border/60 bg-card overflow-hidden animate-pulse">
+              <div className="h-28 bg-muted/40" />
+              <div className="p-5 space-y-3">
+                <div className="h-3 bg-muted rounded-full w-2/3" />
+                <div className="h-2 bg-muted rounded-full" />
+                <div className="h-14 bg-muted/60 rounded-xl" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : analysis.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center justify-center py-24 text-center"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mb-4">
+            <BarChart3 className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-base font-semibold text-foreground mb-1">{t(lang, 'no_data')}</h3>
+          <p className="text-sm text-muted-foreground max-w-xs mb-6">{t(lang, 'no_data_desc')}</p>
+          <button
+            onClick={handleTrigger}
+            disabled={triggering}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-sm transition-all disabled:opacity-60"
+          >
+            <Zap className="w-4 h-4" />
+            {triggering ? t(lang, 'analyzing') : t(lang, 'trigger_analysis')}
+          </button>
+        </motion.div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {analysis.map(stock => <StockCard key={stock.symbol} stock={stock} />)}
+          {analysis.map((stock, i) => (
+            <StockCard key={stock.symbol} stock={stock} index={i} />
+          ))}
         </div>
       )}
     </div>
