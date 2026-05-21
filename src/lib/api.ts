@@ -14,6 +14,7 @@ export interface StockAnalysis {
   currentPrice: number;
   priceChange1D: number;
   priceChange5D: number;
+  priceChange10D: number;
   rsi14: number;
   macdLine: number;
   macdSignal: number;
@@ -23,7 +24,23 @@ export interface StockAnalysis {
   bbLower: number;
   bbPercentB: number;
   bbBandwidth: number;
+  consecutiveDeclineDays: number;
+  reboundScore: number;
   signals: Signal[];
+}
+
+export interface Recommendation {
+  symbol: string;
+  currentPrice: number;
+  reboundScore: number;
+  consecutiveDeclineDays: number;
+  priceChange1D: number;
+  priceChange5D: number;
+  priceChange10D: number;
+  rsi14: number;
+  bbPercentB: number;
+  buySignals: Signal[];
+  topReason: string;
 }
 
 export interface Position {
@@ -80,6 +97,13 @@ export async function closePosition(id: string): Promise<void> {
 export async function triggerAnalysis(): Promise<{ results: StockAnalysis[] }> {
   const res = await fetch(`${BASE}/run`, { method: 'POST' });
   return res.json();
+}
+
+export async function getRecommendations(limit = 10): Promise<Recommendation[]> {
+  const res = await fetch(`${BASE}/recommendations?limit=${limit}`, { next: { revalidate: 900 } });
+  if (!res.ok) return [];
+  const data = await res.json() as { recommendations: Recommendation[] };
+  return data.recommendations ?? [];
 }
 
 export function formatPrice(price: number): string {

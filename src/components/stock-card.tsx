@@ -227,6 +227,19 @@ export function StockCard({ stock, index = 0 }: { stock: StockAnalysis; index?: 
                   {hasBuy ? 'BUY' : hasSell ? 'SELL' : 'WATCH'}
                 </div>
               )}
+              {/* Rebound Score badge */}
+              {stock.reboundScore >= 40 && (
+                <div className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wide flex items-center gap-0.5
+                  ${stock.reboundScore >= 70 ? 'bg-purple-500/15 text-purple-400' : stock.reboundScore >= 55 ? 'bg-indigo-500/15 text-indigo-400' : 'bg-sky-500/15 text-sky-400'}`}>
+                  🎯 {stock.reboundScore}
+                </div>
+              )}
+              {/* Consecutive decline badge */}
+              {stock.consecutiveDeclineDays >= 3 && (
+                <div className="px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wide bg-orange-500/15 text-orange-400">
+                  🔴×{stock.consecutiveDeclineDays}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <div className={`flex items-center gap-0.5 text-xs font-semibold ${pos1D ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -237,6 +250,14 @@ export function StockCard({ stock, index = 0 }: { stock: StockAnalysis; index?: 
               <div className={`text-xs ${pos5D ? 'text-emerald-500/70' : 'text-rose-500/70'}`}>
                 {formatPercent(stock.priceChange5D)} {t(lang, 'five_days')}
               </div>
+              {stock.priceChange10D !== undefined && (
+                <>
+                  <span className="text-muted-foreground/40">·</span>
+                  <div className={`text-xs ${stock.priceChange10D >= 0 ? 'text-emerald-500/50' : 'text-rose-500/50'}`}>
+                    {formatPercent(stock.priceChange10D)} 10D
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <div className="text-right shrink-0">
@@ -257,6 +278,41 @@ export function StockCard({ stock, index = 0 }: { stock: StockAnalysis; index?: 
           macdSignal={stock.macdSignal}
           macdHistogram={stock.macdHistogram}
         />
+
+        {/* Rebound Score bar */}
+        {stock.reboundScore > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-muted-foreground">🎯 Rebound Score</span>
+              <div className="flex items-center gap-1.5">
+                <span className={`text-xs font-bold tabular-nums
+                  ${stock.reboundScore >= 70 ? 'text-purple-400' : stock.reboundScore >= 50 ? 'text-indigo-400' : stock.reboundScore >= 30 ? 'text-sky-400' : 'text-muted-foreground'}`}>
+                  {stock.reboundScore}/100
+                </span>
+                {stock.consecutiveDeclineDays > 0 && (
+                  <span className="text-[10px] text-orange-400 font-medium">
+                    {stock.consecutiveDeclineDays} ngày đỏ
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="relative h-2 rounded-full bg-muted overflow-hidden">
+              <motion.div
+                className="absolute top-0 left-0 h-full rounded-full"
+                style={{
+                  background: stock.reboundScore >= 70
+                    ? 'linear-gradient(90deg, #8b5cf6, #a78bfa)'
+                    : stock.reboundScore >= 50
+                    ? 'linear-gradient(90deg, #6366f1, #818cf8)'
+                    : 'linear-gradient(90deg, #0ea5e9, #38bdf8)',
+                }}
+                initial={{ width: '0%' }}
+                animate={{ width: `${stock.reboundScore}%` }}
+                transition={{ duration: 0.9, ease: 'easeOut', delay: 0.15 }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Signals */}
         {stock.signals.length > 0 && (

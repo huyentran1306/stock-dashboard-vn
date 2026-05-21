@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useLang } from '@/components/providers';
 import { t } from '@/lib/i18n';
-import { getAnalysis, triggerAnalysis, type StockAnalysis } from '@/lib/api';
+import { getAnalysis, getRecommendations, triggerAnalysis, type StockAnalysis, type Recommendation } from '@/lib/api';
 import { StockCard } from '@/components/stock-card';
-import { TrendingUp, TrendingDown, Minus, BarChart3, RefreshCw, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, BarChart3, RefreshCw, Zap, Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 function StatCard({
   value, label, icon: Icon, color, index,
@@ -48,13 +48,15 @@ function StatCard({
 export default function HomePage() {
   const { lang } = useLang();
   const [analysis, setAnalysis] = useState<StockAnalysis[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
 
   async function load() {
     setLoading(true);
-    const data = await getAnalysis();
+    const [data, recs] = await Promise.all([getAnalysis(), getRecommendations(10)]);
     setAnalysis(data);
+    setRecommendations(recs);
     setLoading(false);
   }
 
@@ -104,6 +106,78 @@ export default function HomePage() {
         <StatCard value={neutral.length} label={t(lang, 'neutral')} icon={Minus} color="#f59e0b" index={2} />
         <StatCard value={analysis.length} label={t(lang, 'total_stocks')} icon={BarChart3} color="#6366f1" index={3} />
       </div>
+
+      {/* Recommendations section */}
+      {recommendations.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="rounded-2xl border border-purple-500/25 bg-card overflow-hidden shadow-lg"
+        >
+          <div className="px-5 py-4 border-b border-border/50 flex items-center gap-2">
+            <Target className="w-4 h-4 text-purple-400" />
+            <h2 className="font-bold text-sm text-foreground">Top cổ phiếu nên mua — Rebound Score</h2>
+            <span className="text-[10px] text-muted-foreground ml-auto">Xếp theo khả năng bật lại</span>
+          </div>
+          <div className="divide-y divide-border/40">
+            {recommendations.map((rec, i) => (
+              <motion.div
+                key={rec.symbol}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.05 + 0.25, duration: 0.3 }}
+                className="flex items-center gap-4 px-5 py-3 hover:bg-muted/30 transition-colors"
+              >
+                {/* Rank */}
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0
+                  ${i === 0 ? 'bg-yellow-500/20 text-yellow-400' : i === 1 ? 'bg-zinc-400/20 text-zinc-300' : i === 2 ? 'bg-amber-700/20 text-amber-600' : 'bg-muted text-muted-foreground'}`}>
+                  {i + 1}
+                </div>
+                {/* Symbol */}
+                <div className="w-12 font-black text-sm text-foreground shrink-0">{rec.symbol}</div>
+                {/* Rebound Score bar */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="relative flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <motion.div
+                        className="absolute top-0 left-0 h-full rounded-full"
+                        style={{ background: rec.reboundScore >= 70 ? 'linear-gradient(90deg, #8b5cf6, #a78bfa)' : 'linear-gradient(90deg, #6366f1, #818cf8)' }}
+                        initial={{ width: '0%' }}
+                        animate={{ width: `${rec.reboundScore}%` }}
+                        transition={{ duration: 0.8, ease: 'easeOut', delay: i * 0.05 + 0.35 }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold text-purple-400 tabular-nums shrink-0">{rec.reboundScore}/100</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground truncate">{rec.topReason}</p>
+                </div>
+                {/* Stats */}
+                <div className="flex items-center gap-3 text-xs shrink-0">
+                  <div className="text-right hidden sm:block">
+                    <div className="font-bold text-foreground tabular-nums">{rec.currentPrice.toFixed(1)}k</div>
+                    <div className={`text-[10px] ${rec.priceChange1D >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      {rec.priceChange1D >= 0 ? <ArrowUpRight className="w-3 h-3 inline" /> : <ArrowDownRight className="w-3 h-3 inline" />}
+                      {rec.priceChange1D.toFixed(2)}%
+                    </div>
+                  </div>
+                  <div className="text-right hidden md:block">
+                    <div className="text-[10px] text-muted-foreground">RSI</div>
+                    <div className={`text-xs font-bold tabular-nums ${rec.rsi14 < 35 ? 'text-emerald-500' : rec.rsi14 > 65 ? 'text-rose-500' : 'text-muted-foreground'}`}>
+                      {rec.rsi14.toFixed(0)}
+                    </div>
+                  </div>
+                  {rec.consecutiveDeclineDays >= 2 && (
+                    <div className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 text-[10px] font-bold">
+                      🔴×{rec.consecutiveDeclineDays}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
