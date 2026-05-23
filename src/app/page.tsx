@@ -167,6 +167,21 @@ export default function HomePage() {
                       {rec.rsi14.toFixed(0)}
                     </div>
                   </div>
+                  {/* Entry / TP / SL */}
+                  {rec.suggestedEntry && (
+                    <div className="text-right hidden lg:block text-[10px] space-y-0.5">
+                      <div className="text-sky-400 font-medium">Vào: {rec.suggestedEntry.toFixed(1)}k</div>
+                      <div className="text-emerald-400 font-medium">TP: {rec.suggestedTP.toFixed(1)}k</div>
+                      <div className="text-rose-400 font-medium">SL: {rec.suggestedSL.toFixed(1)}k</div>
+                    </div>
+                  )}
+                  {rec.riskReward > 0 && (
+                    <div className={`hidden lg:flex flex-col items-center justify-center px-2 py-1 rounded-lg text-center
+                      ${rec.riskReward >= 1.5 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                      <div className="text-[9px] text-muted-foreground">R:R</div>
+                      <div className="text-xs font-black">1:{rec.riskReward}</div>
+                    </div>
+                  )}
                   {rec.consecutiveDeclineDays >= 2 && (
                     <div className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 text-[10px] font-bold">
                       🔴×{rec.consecutiveDeclineDays}

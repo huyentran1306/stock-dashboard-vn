@@ -39,8 +39,13 @@ export interface Recommendation {
   priceChange10D: number;
   rsi14: number;
   bbPercentB: number;
+  bbLower: number;
   buySignals: Signal[];
   topReason: string;
+  suggestedEntry: number;
+  suggestedTP: number;
+  suggestedSL: number;
+  riskReward: number;
 }
 
 export interface Position {
